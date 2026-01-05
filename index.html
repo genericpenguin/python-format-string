@@ -68,9 +68,7 @@
                     ></textarea>
                 </div>
                 <div class="space-y-2">
-                    <button onclick="parseInput()" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition">
-                        Parse Format String
-                    </button>
+                    <p class="text-sm text-gray-500 italic">Visualization updates automatically as you type</p>
                     <div class="grid grid-cols-2 gap-2">
                         <button onclick="loadExample(1)" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition text-sm">
                             Example 1
@@ -93,7 +91,7 @@
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Visualization</h2>
                 <div id="output" class="min-h-[400px]">
                     <div class="text-gray-400 text-center py-16">
-                        Enter a format string and click "Parse" to see the visualization
+                        Enter a format string to see the visualization
                     </div>
                 </div>
             </div>
@@ -172,6 +170,7 @@
         let pyodideLoading = false;
         let currentFormatString = '';
         let currentVariables = [];
+        let parseTimeout = null;
 
         const examples = {
             1: ':>30',
@@ -217,7 +216,7 @@
             const output = document.getElementById('output');
 
             if (!input) {
-                output.innerHTML = '<div class="text-gray-400 text-center py-16">Enter a format string and click "Parse" to see the visualization</div>';
+                output.innerHTML = '<div class="text-gray-400 text-center py-16">Enter a format string to see the visualization</div>';
                 document.getElementById('preview-section').classList.add('hidden');
                 return;
             }
@@ -841,11 +840,6 @@
                     pythonCode += `result = f'{${varName}${currentFormatString}}'`;
                 }
 
-                // Debug: show the Python code being executed
-                console.log('Original input:', document.getElementById('input').value);
-                console.log('Current format string:', currentFormatString);
-                console.log('Python code to execute:', pythonCode);
-
                 // Execute Python code
                 py.runPython(pythonCode);
                 const result = py.globals.get('result');
@@ -870,8 +864,26 @@
             }
         }
 
+        // Debounced input handler
+        function handleInputChange() {
+            // Clear existing timeout
+            if (parseTimeout) {
+                clearTimeout(parseTimeout);
+            }
+
+            // Set new timeout for 1 second
+            parseTimeout = setTimeout(() => {
+                parseInput();
+            }, 1000);
+        }
+
         // Auto-parse on load if there's a default
         window.addEventListener('DOMContentLoaded', () => {
+            // Add input event listener for auto-parsing
+            const inputField = document.getElementById('input');
+            inputField.addEventListener('input', handleInputChange);
+
+            // Load default example
             loadExample(3);
         });
     </script>

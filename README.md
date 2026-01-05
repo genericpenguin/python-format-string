@@ -66,9 +66,13 @@ The app uses distinct colors for each formatting component:
 ## Usage
 
 1. Open `index.html` in your web browser
-2. Enter a format string in the input text area
-3. Click "Parse Format String" or use one of the example buttons
-4. View the color-coded breakdown and explanations on the right
+2. Enter a format string in the input text area (or click an example button)
+3. The visualization updates automatically after 1 second of inactivity
+4. View the color-coded breakdown and explanations
+5. If your format string has variables, use the Live Preview section to:
+   - Select the data type for each variable
+   - Enter example values
+   - Click "Format" to see the actual Python-formatted output
 
 ## Examples
 
