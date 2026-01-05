@@ -35,6 +35,18 @@ The Python Format String Visualizer parses Python format strings and f-strings, 
    f'{name!r:>20}'
    ```
 
+### Live Preview with Pyodide
+
+The app includes a **Live Preview** feature powered by [Pyodide](https://pyodide.org/) (Python running in the browser):
+
+- **Automatic variable detection** - Extracts variables from your format string
+- **Type selection** - Choose the data type for each variable (string, int, float, list, dict, bool)
+- **Smart defaults** - Pre-populates sensible example values based on variable names
+- **Real Python execution** - Uses actual Python to format your string, ensuring 100% accuracy
+- **Error display** - Shows Python errors clearly when formatting fails
+
+The Live Preview section appears automatically when you parse a format string with variables. Simply provide values for each variable and click "Format" to see the result.
+
 ### Visual Elements
 
 The app uses distinct colors for each formatting component:
@@ -79,9 +91,10 @@ For complete details on Python's format string syntax, see the included [f-strin
 ## Technical Details
 
 - **Pure vanilla JavaScript** - No build process or compilation required
-- **Tailwind CSS** - Loaded from CDN.
+- **Tailwind CSS** - Loaded from CDN
+- **Pyodide** - Python 3.11 running in WebAssembly for live preview (~6-8MB, loaded on-demand)
 - **Single HTML file** - Easy to deploy and share
-- **No dependencies** - Works offline after initial load
+- **Works offline** - After initial load (including Pyodide cache)
 
 ## Browser Compatibility
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python Format String Visualizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
     <style>
         .token {
             display: inline-block;
@@ -98,6 +99,18 @@
             </div>
         </div>
 
+        <!-- Live Preview Section -->
+        <div id="preview-section" class="mt-8 bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Live Preview</h2>
+            <div id="preview-inputs" class="space-y-4 mb-6">
+                <!-- Input fields will be dynamically generated here -->
+            </div>
+            <button onclick="formatPreview()" class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700 transition">
+                <span id="format-button-text">Format</span>
+            </button>
+            <div id="preview-output" class="mt-6"></div>
+        </div>
+
         <!-- Legend -->
         <div class="mt-8 bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-semibold mb-4 text-gray-800">Legend</h2>
@@ -155,12 +168,44 @@
     </div>
 
     <script>
+        let pyodide = null;
+        let pyodideLoading = false;
+        let currentFormatString = '';
+        let currentVariables = [];
+
         const examples = {
             1: ':>30',
             2: ':.2f',
             3: "f'{key:<10} = {value:.2f}'",
             4: '{:*^30,.2f}'
         };
+
+        async function initPyodide() {
+            if (pyodide) return pyodide;
+            if (pyodideLoading) {
+                // Wait for pyodide to load
+                while (pyodideLoading) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                return pyodide;
+            }
+
+            pyodideLoading = true;
+            const button = document.getElementById('format-button-text');
+            button.textContent = 'Loading Python...';
+
+            try {
+                // loadPyodide is the global function from the Pyodide CDN
+                pyodide = await loadPyodide();
+                button.textContent = 'Format';
+                pyodideLoading = false;
+                return pyodide;
+            } catch (error) {
+                button.textContent = 'Error Loading Python';
+                pyodideLoading = false;
+                throw error;
+            }
+        }
 
         function loadExample(num) {
             document.getElementById('input').value = examples[num];
@@ -173,8 +218,13 @@
 
             if (!input) {
                 output.innerHTML = '<div class="text-gray-400 text-center py-16">Enter a format string and click "Parse" to see the visualization</div>';
+                document.getElementById('preview-section').classList.add('hidden');
                 return;
             }
+
+            // Extract variables for live preview
+            const variables = extractVariables(input);
+            createPreviewInputs(variables);
 
             // Check if it's an f-string
             if (input.match(/^f["'].*["']$/i)) {
@@ -556,6 +606,268 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function extractVariables(input) {
+            const variables = [];
+
+            // Check if it's an f-string
+            if (input.match(/^f["'].*["']$/i)) {
+                const match = input.match(/^f(["'])(.*)\1$/i);
+                if (!match) return variables;
+
+                const content = match[2];
+                let current = '';
+                let inBrace = false;
+                let braceDepth = 0;
+
+                for (let i = 0; i < content.length; i++) {
+                    const char = content[i];
+
+                    if (char === '{' && content[i + 1] !== '{') {
+                        inBrace = true;
+                        braceDepth++;
+                        current = '{';
+                    } else if (char === '}' && content[i - 1] !== '}' && inBrace) {
+                        current += '}';
+                        braceDepth--;
+                        if (braceDepth === 0) {
+                            const varName = extractFieldName(current);
+                            if (varName && !variables.includes(varName)) {
+                                variables.push(varName);
+                            }
+                            current = '';
+                            inBrace = false;
+                        }
+                    } else if (inBrace) {
+                        current += char;
+                    }
+                }
+
+                currentFormatString = input;
+            } else if (input.match(/^\{.*\}$/)) {
+                const varName = extractFieldName(input);
+                if (varName) {
+                    variables.push(varName);
+                } else {
+                    // No variable name, add a generic one
+                    variables.push('value');
+                }
+                currentFormatString = input;
+            } else if (input.startsWith(':')) {
+                // Plain format spec like :>30
+                variables.push('value');
+                currentFormatString = ':' + input.substring(1);
+            } else {
+                // Plain format spec without colon
+                variables.push('value');
+                currentFormatString = ':' + input;
+            }
+
+            return variables;
+        }
+
+        function extractFieldName(field) {
+            const content = field.slice(1, -1);
+            let fieldName = '';
+            let i = 0;
+            let bracketDepth = 0;
+            let inString = false;
+            let stringChar = '';
+
+            while (i < content.length) {
+                const char = content[i];
+
+                if (!inString && (char === '"' || char === "'")) {
+                    inString = true;
+                    stringChar = char;
+                    fieldName += char;
+                    i++;
+                    continue;
+                } else if (inString && char === stringChar && content[i - 1] !== '\\') {
+                    inString = false;
+                    fieldName += char;
+                    i++;
+                    continue;
+                }
+
+                if (!inString && char === '[') {
+                    bracketDepth++;
+                    fieldName += char;
+                    i++;
+                    continue;
+                } else if (!inString && char === ']') {
+                    bracketDepth--;
+                    fieldName += char;
+                    i++;
+                    continue;
+                }
+
+                if (!inString && bracketDepth === 0 && (char === '!' || char === ':')) {
+                    break;
+                }
+
+                fieldName += char;
+                i++;
+            }
+
+            // Extract the base variable name (before any brackets or dots)
+            const baseMatch = fieldName.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+            return baseMatch ? baseMatch[0] : fieldName;
+        }
+
+        function createPreviewInputs(variables) {
+            const previewSection = document.getElementById('preview-section');
+            const previewInputs = document.getElementById('preview-inputs');
+
+            if (variables.length === 0) {
+                previewSection.classList.add('hidden');
+                return;
+            }
+
+            currentVariables = variables;
+            previewSection.classList.remove('hidden');
+
+            // Determine default values based on variable names
+            const getDefaultValue = (varName) => {
+                const lower = varName.toLowerCase();
+                if (lower.includes('name') || lower === 'key') return { type: 'str', value: '"example"' };
+                if (lower.includes('price') || lower.includes('value') || lower.includes('amount')) return { type: 'float', value: '123.45' };
+                if (lower.includes('count') || lower.includes('num') || lower.includes('id')) return { type: 'int', value: '42' };
+                if (lower.includes('list') || lower.includes('items')) return { type: 'list', value: '[1, 2, 3]' };
+                if (lower.includes('dict') || lower.includes('map')) return { type: 'dict', value: '{"a": 1}' };
+                if (lower === 'value') return { type: 'float', value: '3.14159' };
+                return { type: 'str', value: '"sample"' };
+            };
+
+            let html = '';
+            variables.forEach((varName, index) => {
+                const defaults = getDefaultValue(varName);
+                html += `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">${escapeHtml(varName)}</label>
+                            <select id="type-${index}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="str" ${defaults.type === 'str' ? 'selected' : ''}>String</option>
+                                <option value="int" ${defaults.type === 'int' ? 'selected' : ''}>Integer</option>
+                                <option value="float" ${defaults.type === 'float' ? 'selected' : ''}>Float</option>
+                                <option value="list" ${defaults.type === 'list' ? 'selected' : ''}>List</option>
+                                <option value="dict" ${defaults.type === 'dict' ? 'selected' : ''}>Dictionary</option>
+                                <option value="bool" ${defaults.type === 'bool' ? 'selected' : ''}>Boolean</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                            <input type="text" id="value-${index}"
+                                value="${escapeHtml(defaults.value)}"
+                                placeholder='e.g., "hello", 42, 3.14, [1,2,3], {"a":1}'
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm">
+                        </div>
+                    </div>
+                `;
+            });
+
+            previewInputs.innerHTML = html;
+        }
+
+        async function formatPreview() {
+            const previewOutput = document.getElementById('preview-output');
+
+            try {
+                // Load Pyodide if not already loaded
+                const py = await initPyodide();
+
+                // Collect variable values
+                const variables = {};
+                for (let i = 0; i < currentVariables.length; i++) {
+                    const varName = currentVariables[i];
+                    const type = document.getElementById(`type-${i}`).value;
+                    const valueStr = document.getElementById(`value-${i}`).value.trim();
+
+                    if (!valueStr) {
+                        previewOutput.innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                            <p class="text-yellow-700">Please provide a value for <strong>${escapeHtml(varName)}</strong></p>
+                        </div>`;
+                        return;
+                    }
+
+                    // Convert the value based on type
+                    let pythonValue;
+                    switch (type) {
+                        case 'str':
+                            pythonValue = valueStr.startsWith('"') || valueStr.startsWith("'")
+                                ? valueStr
+                                : JSON.stringify(valueStr);
+                            break;
+                        case 'int':
+                            pythonValue = valueStr;
+                            break;
+                        case 'float':
+                            pythonValue = valueStr;
+                            break;
+                        case 'list':
+                            pythonValue = valueStr;
+                            break;
+                        case 'dict':
+                            pythonValue = valueStr;
+                            break;
+                        case 'bool':
+                            pythonValue = valueStr.toLowerCase() === 'true' || valueStr === '1' ? 'True' : 'False';
+                            break;
+                        default:
+                            pythonValue = valueStr;
+                    }
+
+                    variables[varName] = pythonValue;
+                }
+
+                // Build Python code to execute the format string
+                let pythonCode = '';
+                Object.entries(variables).forEach(([varName, value]) => {
+                    pythonCode += `${varName} = ${value}\n`;
+                });
+
+                // Determine how to format based on input type
+                if (currentFormatString.match(/^f["'].*["']$/i)) {
+                    // F-string
+                    pythonCode += `result = ${currentFormatString}`;
+                } else if (currentFormatString.match(/^\{.*\}$/)) {
+                    // Replacement field - use .format()
+                    const varName = currentVariables[0];
+                    pythonCode += `result = '${currentFormatString}'.format(${varName}=${varName})`;
+                } else {
+                    // Just format spec
+                    const varName = currentVariables[0];
+                    pythonCode += `result = f'{${varName}${currentFormatString}}'`;
+                }
+
+                // Debug: show the Python code being executed
+                console.log('Original input:', document.getElementById('input').value);
+                console.log('Current format string:', currentFormatString);
+                console.log('Python code to execute:', pythonCode);
+
+                // Execute Python code
+                py.runPython(pythonCode);
+                const result = py.globals.get('result');
+
+                // Display result
+                previewOutput.innerHTML = `
+                    <div class="bg-green-50 border-l-4 border-green-400 p-4">
+                        <p class="text-sm font-medium text-green-800 mb-2">Formatted Output:</p>
+                        <pre class="bg-white p-3 rounded border border-green-200 font-mono text-lg whitespace-pre overflow-x-auto">${escapeHtml(result)}</pre>
+                    </div>
+                `;
+
+            } catch (error) {
+                previewOutput.innerHTML = `
+                    <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                        <p class="text-sm font-medium text-red-800 mb-2">Error:</p>
+                        <div class="bg-white p-3 rounded border border-red-200 font-mono text-sm text-red-600">
+                            ${escapeHtml(error.message || String(error))}
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         // Auto-parse on load if there's a default
