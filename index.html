@@ -269,9 +269,47 @@
             let formatSpec = '';
 
             let i = 0;
-            // Parse field name (until ! or :)
-            while (i < content.length && content[i] !== '!' && content[i] !== ':') {
-                fieldName += content[i];
+            let bracketDepth = 0;
+            let inString = false;
+            let stringChar = '';
+
+            // Parse field name (until ! or : that's not inside brackets or strings)
+            while (i < content.length) {
+                const char = content[i];
+
+                // Track string boundaries
+                if (!inString && (char === '"' || char === "'")) {
+                    inString = true;
+                    stringChar = char;
+                    fieldName += char;
+                    i++;
+                    continue;
+                } else if (inString && char === stringChar && content[i - 1] !== '\\') {
+                    inString = false;
+                    fieldName += char;
+                    i++;
+                    continue;
+                }
+
+                // Track bracket depth
+                if (!inString && char === '[') {
+                    bracketDepth++;
+                    fieldName += char;
+                    i++;
+                    continue;
+                } else if (!inString && char === ']') {
+                    bracketDepth--;
+                    fieldName += char;
+                    i++;
+                    continue;
+                }
+
+                // Only stop at ! or : if we're not inside brackets or strings
+                if (!inString && bracketDepth === 0 && (char === '!' || char === ':')) {
+                    break;
+                }
+
+                fieldName += char;
                 i++;
             }
 
