@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Format String Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .token {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+        .token-variable { background-color: #e0e7ff; color: #3730a3; }
+        .token-conversion { background-color: #fce7f3; color: #9f1239; }
+        .token-fill { background-color: #fef3c7; color: #92400e; }
+        .token-align { background-color: #ccfbf1; color: #115e59; }
+        .token-sign { background-color: #ddd6fe; color: #5b21b6; }
+        .token-alternate { background-color: #fed7aa; color: #9a3412; }
+        .token-zero-pad { background-color: #fecaca; color: #991b1b; }
+        .token-width { background-color: #bbf7d0; color: #14532d; }
+        .token-grouping { background-color: #fecdd3; color: #881337; }
+        .token-precision { background-color: #bfdbfe; color: #1e3a8a; }
+        .token-type { background-color: #e9d5ff; color: #6b21a8; }
+        .token-literal { background-color: #f3f4f6; color: #374151; }
+        .token-brace { background-color: #d1d5db; color: #1f2937; font-weight: bold; }
+        .explanation {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f9fafb;
+            border-left: 4px solid #6366f1;
+            border-radius: 0.25rem;
+        }
+        .explanation-item {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background-color: white;
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+        }
+        textarea {
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Python Format String Visualizer</h1>
+            <p class="text-gray-600">Visualize and understand Python format strings and f-strings</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Input Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Input</h2>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Format String</label>
+                    <textarea
+                        id="input"
+                        rows="10"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Enter a format string, e.g.:&#10;:>30&#10;:.2f&#10;f'{key:<10} = {value:.2f}'"
+                    ></textarea>
+                </div>
+                <div class="space-y-2">
+                    <button onclick="parseInput()" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition">
+                        Parse Format String
+                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="loadExample(1)" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition text-sm">
+                            Example 1
+                        </button>
+                        <button onclick="loadExample(2)" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition text-sm">
+                            Example 2
+                        </button>
+                        <button onclick="loadExample(3)" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition text-sm">
+                            Example 3
+                        </button>
+                        <button onclick="loadExample(4)" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition text-sm">
+                            Example 4
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Visualization</h2>
+                <div id="output" class="min-h-[400px]">
+                    <div class="text-gray-400 text-center py-16">
+                        Enter a format string and click "Parse" to see the visualization
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Legend</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="token token-variable">variable</span>
+                    <span class="text-sm text-gray-600">Variable name</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-conversion">!r</span>
+                    <span class="text-sm text-gray-600">Conversion</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-fill">*</span>
+                    <span class="text-sm text-gray-600">Fill character</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-align">&lt;</span>
+                    <span class="text-sm text-gray-600">Alignment</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-sign">+</span>
+                    <span class="text-sm text-gray-600">Sign</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-alternate">#</span>
+                    <span class="text-sm text-gray-600">Alternate form</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-zero-pad">0</span>
+                    <span class="text-sm text-gray-600">Zero padding</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-width">30</span>
+                    <span class="text-sm text-gray-600">Width</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-grouping">,</span>
+                    <span class="text-sm text-gray-600">Grouping</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-precision">.2</span>
+                    <span class="text-sm text-gray-600">Precision</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-type">f</span>
+                    <span class="text-sm text-gray-600">Type</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="token token-literal">text</span>
+                    <span class="text-sm text-gray-600">Literal text</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const examples = {
+            1: ':>30',
+            2: ':.2f',
+            3: "f'{key:<10} = {value:.2f}'",
+            4: '{:*^30,.2f}'
+        };
+
+        function loadExample(num) {
+            document.getElementById('input').value = examples[num];
+            parseInput();
+        }
+
+        function parseInput() {
+            const input = document.getElementById('input').value.trim();
+            const output = document.getElementById('output');
+
+            if (!input) {
+                output.innerHTML = '<div class="text-gray-400 text-center py-16">Enter a format string and click "Parse" to see the visualization</div>';
+                return;
+            }
+
+            // Check if it's an f-string
+            if (input.match(/^f["'].*["']$/i)) {
+                parseFString(input, output);
+            } else if (input.match(/^\{.*\}$/)) {
+                parseReplacementField(input, output);
+            } else if (input.startsWith(':')) {
+                parseFormatSpec(input.substring(1), output, null);
+            } else {
+                parseFormatSpec(input, output, null);
+            }
+        }
+
+        function parseFString(input, output) {
+            // Extract the string content (remove f' or f" wrapper)
+            const match = input.match(/^f(["'])(.*)\1$/i);
+            if (!match) {
+                output.innerHTML = '<div class="text-red-500">Invalid f-string format</div>';
+                return;
+            }
+
+            const content = match[2];
+            const parts = [];
+            let current = '';
+            let inBrace = false;
+            let braceDepth = 0;
+
+            // Parse the f-string content
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+
+                if (char === '{' && content[i + 1] !== '{') {
+                    if (current) {
+                        parts.push({ type: 'literal', value: current });
+                        current = '';
+                    }
+                    inBrace = true;
+                    braceDepth++;
+                    current = '{';
+                } else if (char === '}' && content[i - 1] !== '}' && inBrace) {
+                    current += '}';
+                    braceDepth--;
+                    if (braceDepth === 0) {
+                        parts.push({ type: 'field', value: current });
+                        current = '';
+                        inBrace = false;
+                    }
+                } else if (char === '{' && content[i + 1] === '{') {
+                    current += '{';
+                    i++; // Skip next brace
+                } else if (char === '}' && content[i + 1] === '}') {
+                    current += '}';
+                    i++; // Skip next brace
+                } else {
+                    current += char;
+                }
+            }
+
+            if (current) {
+                parts.push({ type: 'literal', value: current });
+            }
+
+            // Render the parts
+            let html = '<div class="space-y-6">';
+
+            parts.forEach((part, index) => {
+                if (part.type === 'literal') {
+                    html += `<div class="mb-4">
+                        <div class="font-semibold text-gray-700 mb-2">Literal Text</div>
+                        <div><span class="token token-literal">${escapeHtml(part.value)}</span></div>
+                    </div>`;
+                } else if (part.type === 'field') {
+                    html += parseReplacementFieldToHtml(part.value, index);
+                }
+            });
+
+            html += '</div>';
+            output.innerHTML = html;
+        }
+
+        function parseReplacementField(input, output) {
+            output.innerHTML = parseReplacementFieldToHtml(input, 0);
+        }
+
+        function parseReplacementFieldToHtml(field, index) {
+            // Remove outer braces
+            const content = field.slice(1, -1);
+
+            // Parse: [field_name] ["!" conversion] [":" format_spec]
+            let fieldName = '';
+            let conversion = '';
+            let formatSpec = '';
+
+            let i = 0;
+            // Parse field name (until ! or :)
+            while (i < content.length && content[i] !== '!' && content[i] !== ':') {
+                fieldName += content[i];
+                i++;
+            }
+
+            // Parse conversion (if present)
+            if (i < content.length && content[i] === '!') {
+                i++; // skip !
+                if (i < content.length) {
+                    conversion = content[i];
+                    i++;
+                }
+            }
+
+            // Parse format spec (if present)
+            if (i < content.length && content[i] === ':') {
+                i++; // skip :
+                formatSpec = content.substring(i);
+            }
+
+            let html = '<div class="mb-4">';
+            html += `<div class="font-semibold text-gray-700 mb-2">Replacement Field ${index > 0 ? index : ''}</div>`;
+            html += '<div class="mb-2">';
+            html += '<span class="token token-brace">{</span>';
+
+            if (fieldName) {
+                html += `<span class="token token-variable">${escapeHtml(fieldName)}</span>`;
+            }
+
+            if (conversion) {
+                html += '<span class="token token-brace">!</span>';
+                html += `<span class="token token-conversion">${escapeHtml(conversion)}</span>`;
+            }
+
+            if (formatSpec) {
+                html += '<span class="token token-brace">:</span>';
+            }
+
+            html += '</div>';
+
+            if (fieldName) {
+                html += `<div class="explanation-item">
+                    <span class="token token-variable">${escapeHtml(fieldName)}</span>
+                    <span class="text-gray-600"> → Variable/field name</span>
+                </div>`;
+            }
+
+            if (conversion) {
+                const conversionMap = {
+                    'r': 'repr() - official string representation',
+                    's': 'str() - informal string representation',
+                    'a': 'ascii() - ASCII-only representation'
+                };
+                html += `<div class="explanation-item">
+                    <span class="token token-conversion">!${escapeHtml(conversion)}</span>
+                    <span class="text-gray-600"> → ${conversionMap[conversion] || 'Conversion'}</span>
+                </div>`;
+            }
+
+            if (formatSpec) {
+                html += parseFormatSpecToHtml(formatSpec);
+            }
+
+            html += '<div class="mt-2"><span class="token token-brace">}</span></div>';
+            html += '</div>';
+
+            return html;
+        }
+
+        function parseFormatSpec(spec, output, fieldName) {
+            output.innerHTML = parseFormatSpecToHtml(spec);
+        }
+
+        function parseFormatSpecToHtml(spec) {
+            // Format spec: [[fill]align][sign][z][#][0][width][grouping][.precision[grouping]][type]
+            const tokens = [];
+            const explanations = [];
+            let i = 0;
+
+            // Check for fill and align (fill is any char, align is <, >, =, ^)
+            let fill = '';
+            let align = '';
+            if (i + 1 < spec.length && '<>=^'.includes(spec[i + 1])) {
+                fill = spec[i];
+                align = spec[i + 1];
+                i += 2;
+            } else if (i < spec.length && '<>=^'.includes(spec[i])) {
+                align = spec[i];
+                i++;
+            }
+
+            if (fill) {
+                tokens.push({ type: 'fill', value: fill });
+                explanations.push({ type: 'fill', value: fill, desc: 'Fill character' });
+            }
+
+            if (align) {
+                tokens.push({ type: 'align', value: align });
+                const alignMap = {
+                    '<': 'Left align',
+                    '>': 'Right align',
+                    '^': 'Center align',
+                    '=': 'Sign-aware padding'
+                };
+                explanations.push({ type: 'align', value: align, desc: alignMap[align] });
+            }
+
+            // Sign
+            if (i < spec.length && '+-'.includes(spec[i])) {
+                const sign = spec[i];
+                tokens.push({ type: 'sign', value: sign });
+                const signMap = {
+                    '+': 'Show sign for both positive and negative',
+                    '-': 'Show sign only for negative (default)',
+                    ' ': 'Space for positive, minus for negative'
+                };
+                explanations.push({ type: 'sign', value: sign, desc: signMap[sign] || 'Sign' });
+                i++;
+            } else if (i < spec.length && spec[i] === ' ') {
+                tokens.push({ type: 'sign', value: ' ' });
+                explanations.push({ type: 'sign', value: ' ', desc: 'Space for positive, minus for negative' });
+                i++;
+            }
+
+            // z flag
+            if (i < spec.length && spec[i] === 'z') {
+                tokens.push({ type: 'alternate', value: 'z' });
+                explanations.push({ type: 'alternate', value: 'z', desc: 'Coerce negative zero to positive zero' });
+                i++;
+            }
+
+            // Alternate form
+            if (i < spec.length && spec[i] === '#') {
+                tokens.push({ type: 'alternate', value: '#' });
+                explanations.push({ type: 'alternate', value: '#', desc: 'Alternate form (0b, 0o, 0x prefix)' });
+                i++;
+            }
+
+            // Zero padding
+            if (i < spec.length && spec[i] === '0') {
+                tokens.push({ type: 'zero-pad', value: '0' });
+                explanations.push({ type: 'zero-pad', value: '0', desc: 'Zero-padding for numbers' });
+                i++;
+            }
+
+            // Width
+            let width = '';
+            while (i < spec.length && spec[i].match(/\d/)) {
+                width += spec[i];
+                i++;
+            }
+            if (width) {
+                tokens.push({ type: 'width', value: width });
+                explanations.push({ type: 'width', value: width, desc: `Minimum field width: ${width} characters` });
+            }
+
+            // Grouping after width
+            if (i < spec.length && ',_'.includes(spec[i])) {
+                const grouping = spec[i];
+                tokens.push({ type: 'grouping', value: grouping });
+                const groupMap = {
+                    ',': 'Comma thousands separator',
+                    '_': 'Underscore thousands separator'
+                };
+                explanations.push({ type: 'grouping', value: grouping, desc: groupMap[grouping] });
+                i++;
+            }
+
+            // Precision
+            if (i < spec.length && spec[i] === '.') {
+                let precision = '.';
+                i++;
+                while (i < spec.length && spec[i].match(/\d/)) {
+                    precision += spec[i];
+                    i++;
+                }
+                tokens.push({ type: 'precision', value: precision });
+                const precNum = precision.substring(1);
+                explanations.push({
+                    type: 'precision',
+                    value: precision,
+                    desc: precNum ? `Precision: ${precNum} decimal places` : 'Precision specified by grouping'
+                });
+
+                // Grouping after precision
+                if (i < spec.length && ',_'.includes(spec[i])) {
+                    const grouping = spec[i];
+                    tokens.push({ type: 'grouping', value: grouping });
+                    const groupMap = {
+                        ',': 'Comma separator for fractional part',
+                        '_': 'Underscore separator for fractional part'
+                    };
+                    explanations.push({ type: 'grouping', value: grouping, desc: groupMap[grouping] });
+                    i++;
+                }
+            }
+
+            // Type
+            if (i < spec.length) {
+                const type = spec[i];
+                tokens.push({ type: 'type', value: type });
+                const typeMap = {
+                    'b': 'Binary format',
+                    'c': 'Character',
+                    'd': 'Decimal integer',
+                    'o': 'Octal format',
+                    'x': 'Hexadecimal (lowercase)',
+                    'X': 'Hexadecimal (uppercase)',
+                    'n': 'Number (locale-aware)',
+                    'e': 'Scientific notation (lowercase e)',
+                    'E': 'Scientific notation (uppercase E)',
+                    'f': 'Fixed-point notation',
+                    'F': 'Fixed-point notation (uppercase NAN/INF)',
+                    'g': 'General format',
+                    'G': 'General format (uppercase)',
+                    '%': 'Percentage',
+                    's': 'String format'
+                };
+                explanations.push({ type: 'type', value: type, desc: typeMap[type] || 'Type specifier' });
+                i++;
+            }
+
+            // Build HTML
+            let html = '<div class="mb-4">';
+            html += '<div class="font-semibold text-gray-700 mb-2">Format Specification</div>';
+            html += '<div class="mb-2">';
+            tokens.forEach(token => {
+                html += `<span class="token token-${token.type}">${escapeHtml(token.value)}</span>`;
+            });
+            html += '</div>';
+
+            html += '<div class="explanation">';
+            explanations.forEach(exp => {
+                html += `<div class="explanation-item">
+                    <span class="token token-${exp.type}">${escapeHtml(exp.value)}</span>
+                    <span class="text-gray-600"> → ${exp.desc}</span>
+                </div>`;
+            });
+            html += '</div>';
+            html += '</div>';
+
+            return html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-parse on load if there's a default
+        window.addEventListener('DOMContentLoaded', () => {
+            loadExample(3);
+        });
+    </script>
+</body>
+</html>
