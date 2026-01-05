@@ -833,7 +833,14 @@
                 } else if (currentFormatString.match(/^\{.*\}$/)) {
                     // Replacement field - use .format()
                     const varName = currentVariables[0];
-                    pythonCode += `result = '${currentFormatString}'.format(${varName}=${varName})`;
+                    // Check if the field has a name or is positional (e.g., {:fmt} vs {name:fmt})
+                    const hasFieldName = currentFormatString.match(/^\{[a-zA-Z_]/);
+                    if (hasFieldName) {
+                        pythonCode += `result = '${currentFormatString}'.format(${varName}=${varName})`;
+                    } else {
+                        // Positional argument
+                        pythonCode += `result = '${currentFormatString}'.format(${varName})`;
+                    }
                 } else {
                     // Just format spec
                     const varName = currentVariables[0];
