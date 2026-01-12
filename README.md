@@ -10,6 +10,9 @@ The Python Format String Visualizer parses Python format strings and f-strings, 
 - **Clear explanations** - Human-readable descriptions of what each component does
 - **Visual grouping** - Related elements are grouped together for easier understanding
 
+> [!NOTE]
+> [Link](https://genericpenguin.github.io/python-format-string/) to published app.
+
 ## Features
 
 ### Supported Input Formats
